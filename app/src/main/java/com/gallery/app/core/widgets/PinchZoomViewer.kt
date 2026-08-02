@@ -45,15 +45,17 @@ fun PinchZoomViewer(
                     }
                 )
             }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
+            .pointerInput(scale) {
+                if (scale > 1.01f) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        scale = (scale * zoom).coerceIn(1f, 5f)
+                        if (scale > 1f) {
+                            offsetX += pan.x
+                            offsetY += pan.y
+                        } else {
+                            offsetX = 0f
+                            offsetY = 0f
+                        }
                     }
                 }
             },
