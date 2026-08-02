@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -282,87 +283,14 @@ fun VideoPlayerSurface(
                     )
                 }
 
-                // Text Overlay Controls Bar
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(bottom = 150.dp, start = 16.dp, end = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (showTextEntry) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF1E1E24), RoundedCornerShape(12.dp))
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = overlayText,
-                                onValueChange = { overlayText = it },
-                                placeholder = { Text("Add text overlay...", color = Color.Gray) },
-                                modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White
-                                )
-                            )
-                            IconButton(onClick = { showTextEntry = false }) {
-                                Text("Done", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(if (showTextEntry) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f))
-                                .clickable { showTextEntry = !showTextEntry },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.FormatSize, contentDescription = "Add Text", tint = Color.White, modifier = Modifier.size(18.dp))
-                        }
-
-                        val styleLabels = listOf("Aa", "AI", "Aa", "A")
-                        styleLabels.forEachIndexed { index, label ->
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(if (activeTextStyleIndex == index) Color.White else Color.Black.copy(alpha = 0.6f))
-                                    .border(
-                                        width = if (activeTextStyleIndex == index) 2.dp else 1.dp,
-                                        color = if (activeTextStyleIndex == index) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.3f),
-                                        shape = CircleShape
-                                    )
-                                    .clickable { activeTextStyleIndex = index },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    color = if (activeTextStyleIndex == index) Color.Black else Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-                }
-
                 // Bottom Fixed Playhead + Moving Filmstrip & Ruler Navigation Bar Container
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.85f))
-                        .padding(bottom = 12.dp, top = 8.dp)
+                        .navigationBarsPadding()
+                        .padding(bottom = 8.dp, top = 8.dp)
                 ) {
                     // Time Badge & Mute Toggle Controls
                     Row(
