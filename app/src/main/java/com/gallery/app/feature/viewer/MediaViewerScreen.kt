@@ -184,6 +184,7 @@ fun MediaViewerScreen(
             // Main Media Pager View (Photos and Videos swiping)
             HorizontalPager(
                 state = pagerState,
+                userScrollEnabled = !showVideoFrames,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val item = effectiveItems[page]
