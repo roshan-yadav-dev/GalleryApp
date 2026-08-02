@@ -132,9 +132,9 @@ fun GalleryScreen(
                 uiState.allItems.isEmpty() -> EmptyStateView(message = stringResource(id = R.string.gallery_empty))
                 else -> {
                     val adaptiveMinSize = when (uiState.gridSize) {
-                        GridSize.SMALL -> 65.dp
-                        GridSize.MEDIUM -> 85.dp
-                        GridSize.LARGE -> 110.dp
+                        GridSize.SMALL -> 85.dp
+                        GridSize.MEDIUM -> 115.dp
+                        GridSize.LARGE -> 155.dp
                     }
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = adaptiveMinSize),

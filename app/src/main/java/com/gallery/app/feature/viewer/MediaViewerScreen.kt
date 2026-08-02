@@ -116,11 +116,7 @@ fun MediaViewerScreen(
             ) {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = currentItem?.displayName ?: "",
-                            color = Color.White,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        // Title left empty so content name is not displayed on screen
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
@@ -164,8 +160,8 @@ fun MediaViewerScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 8.dp)
-                        .size(36.dp)
+                        .padding(start = 12.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.5f))
                         .clickable {
@@ -179,7 +175,7 @@ fun MediaViewerScreen(
                         imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
                         contentDescription = "Previous Media",
                         tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -189,8 +185,8 @@ fun MediaViewerScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                        .size(36.dp)
+                        .padding(end = 12.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.5f))
                         .clickable {
@@ -204,7 +200,7 @@ fun MediaViewerScreen(
                         imageVector = Icons.AutoMirrored.Filled.NavigateNext,
                         contentDescription = "Next Media",
                         tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -226,31 +222,30 @@ fun MediaViewerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 2.dp),
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Previous Content Button
                         if (pagerState.currentPage > 0) {
-                            val prevItem = effectiveItems[pagerState.currentPage - 1]
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(Color(0xFF2A2D34))
                                     .clickable {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(pagerState.currentPage - 1)
                                         }
                                     }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = prevItem.displayName.take(10),
+                                    text = "Prev",
                                     color = Color.White,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -262,33 +257,32 @@ fun MediaViewerScreen(
                         Text(
                             text = "${pagerState.currentPage + 1} of ${effectiveItems.size}",
                             color = Color.LightGray,
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
 
                         // Next Content Button
                         if (pagerState.currentPage < effectiveItems.size - 1) {
-                            val nextItem = effectiveItems[pagerState.currentPage + 1]
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(Color(0xFF2A2D34))
                                     .clickable {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                         }
                                     }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Text(
-                                    text = nextItem.displayName.take(10),
+                                    text = "Next",
                                     color = Color.White,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
-                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                         } else {
                             Box(modifier = Modifier.size(1.dp))
@@ -299,7 +293,7 @@ fun MediaViewerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 4.dp),
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -313,21 +307,17 @@ fun MediaViewerScreen(
                                     }
                                     context.startActivity(Intent.createChooser(sendIntent, "Share Media"))
                                 }
-                            },
-                            modifier = Modifier.size(36.dp)
+                            }
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
 
-                        IconButton(
-                            onClick = { viewModel.toggleFavorite() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
+                        IconButton(onClick = { viewModel.toggleFavorite() }) {
                             Icon(
                                 imageVector = if (currentItem?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Favorite",
                                 tint = if (currentItem?.isFavorite == true) MaterialTheme.colorScheme.tertiary else Color.White,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
 
@@ -339,24 +329,17 @@ fun MediaViewerScreen(
                                 } else {
                                     onEditImage(uriStr)
                                 }
-                            },
-                            modifier = Modifier.size(36.dp)
+                            }
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
 
-                        IconButton(
-                            onClick = { viewModel.deleteCurrentMedia() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(20.dp))
+                        IconButton(onClick = { viewModel.deleteCurrentMedia() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
 
-                        IconButton(
-                            onClick = { viewModel.showDetails() },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(20.dp))
+                        IconButton(onClick = { viewModel.showDetails() }) {
+                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
