@@ -131,13 +131,18 @@ fun GalleryScreen(
                 uiState.isLoading -> LoadingStateView()
                 uiState.allItems.isEmpty() -> EmptyStateView(message = stringResource(id = R.string.gallery_empty))
                 else -> {
+                    val adaptiveMinSize = when (uiState.gridSize) {
+                        GridSize.SMALL -> 85.dp
+                        GridSize.MEDIUM -> 115.dp
+                        GridSize.LARGE -> 155.dp
+                    }
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(uiState.gridSize.columns),
+                        columns = GridCells.Adaptive(minSize = adaptiveMinSize),
                         contentPadding = PaddingValues(4.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         uiState.groups.forEach { group ->
-                            item(span = { GridItemSpan(uiState.gridSize.columns) }) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
                                 StickyHeader(title = group.dateHeader)
                             }
                             items(group.items, key = { it.id }) { item ->

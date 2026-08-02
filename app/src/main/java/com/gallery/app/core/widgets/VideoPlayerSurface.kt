@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -413,7 +414,9 @@ fun VideoPlayerSurface(
                     }
 
                     val progressRatio = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-                    val trackWidthPx = maxOf(containerWidthPx * 1.8f, 1200f)
+                    val trackWidthPx = maxOf(containerWidthPx * 1.5f, 600f)
+                    val density = LocalDensity.current
+                    val trackWidthDp = with(density) { trackWidthPx.toDp() }
 
                     // Scrubber Container Viewport
                     Box(
@@ -455,7 +458,7 @@ fun VideoPlayerSurface(
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
-                                .width((trackWidthPx / LocalContext.current.resources.displayMetrics.density).dp)
+                                .width(trackWidthDp)
                                 .graphicsLayer {
                                     val halfViewport = containerWidthPx / 2f
                                     translationX = halfViewport - (progressRatio * trackWidthPx)
