@@ -85,8 +85,11 @@ fun AppNavGraph(
                 exitTransition = { slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, animationSpec = tween(300)) }
             ) {
                 GalleryScreen(
-                    onMediaClick = { mediaId ->
-                        navController.navigate(Screen.Viewer.createRoute(mediaId))
+                    onEditVideo = { uri ->
+                        navController.navigate(Screen.VideoEditor.createRoute(uri))
+                    },
+                    onEditImage = { uri ->
+                        navController.navigate(Screen.ImageEditor.createRoute(uri))
                     }
                 )
             }

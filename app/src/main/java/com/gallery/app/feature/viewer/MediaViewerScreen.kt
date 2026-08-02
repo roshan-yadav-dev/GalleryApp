@@ -48,6 +48,8 @@ import com.gallery.app.core.widgets.VideoPlayerSurface
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MediaViewerScreen(
+    initialMediaId: Long? = null,
+    mediaItemsList: List<com.gallery.app.core.domain.model.MediaItem>? = null,
     onNavigateBack: () -> Unit,
     onEditVideo: (String) -> Unit = {},
     onEditImage: (String) -> Unit = {},
@@ -57,14 +59,23 @@ fun MediaViewerScreen(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
 
-    if (uiState.isLoading || uiState.mediaItems.isEmpty()) {
-        LoadingStateView()
+    val effectiveItems = mediaItemsList ?: uiState.mediaItems
+    if (effectiveItems.isEmpty()) {
+        if (uiState.isLoading) {
+            LoadingStateView()
+        }
         return
     }
 
+    val startIndex = if (initialMediaId != null) {
+        effectiveItems.indexOfFirst { it.id == initialMediaId }.coerceAtLeast(0)
+    } else {
+        uiState.currentIndex.coerceIn(0, (effectiveItems.size - 1).coerceAtLeast(0))
+    }
+
     val pagerState = rememberPagerState(
-        initialPage = uiState.currentIndex,
-        pageCount = { uiState.mediaItems.size }
+        initialPage = startIndex,
+        pageCount = { effectiveItems.size }
     )
 
     LaunchedEffect(pagerState) {
@@ -152,7 +163,7 @@ fun MediaViewerScreen(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                val item = uiState.mediaItems[page]
+                val item = effectiveItems[page]
                 if (item.isVideo) {
                     VideoPlayerSurface(
                         videoUri = item.uri,

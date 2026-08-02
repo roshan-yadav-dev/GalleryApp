@@ -1,5 +1,11 @@
 package com.gallery.app.feature.gallery
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,9 +16,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,15 +45,18 @@ import com.gallery.app.core.widgets.LoadingStateView
 import com.gallery.app.core.widgets.MediaCard
 import com.gallery.app.core.widgets.SelectionTopBar
 import com.gallery.app.core.widgets.StickyHeader
+import com.gallery.app.feature.viewer.MediaViewerScreen
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun GalleryScreen(
-    onMediaClick: (Long) -> Unit,
+    onEditVideo: (String) -> Unit = {},
+    onEditImage: (String) -> Unit = {},
     viewModel: GalleryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showMenu by remember { mutableStateOf(false) }
+    var activeViewerMediaId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         topBar = {
@@ -147,7 +154,7 @@ fun GalleryScreen(
                                         if (uiState.isSelectionMode) {
                                             viewModel.toggleItemSelection(item.id)
                                         } else {
-                                            onMediaClick(item.id)
+                                            activeViewerMediaId = item.id
                                         }
                                     },
                                     onLongClick = {
@@ -158,6 +165,32 @@ fun GalleryScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // Inline Fullscreen Media Viewer Overlay (Swiping left/right across all gallery media)
+            AnimatedVisibility(
+                visible = activeViewerMediaId != null,
+                enter = fadeIn() + scaleIn(initialScale = 0.95f),
+                exit = fadeOut() + scaleOut(targetScale = 0.95f)
+            ) {
+                if (activeViewerMediaId != null) {
+                    BackHandler {
+                        activeViewerMediaId = null
+                    }
+                    MediaViewerScreen(
+                        initialMediaId = activeViewerMediaId,
+                        mediaItemsList = uiState.allItems,
+                        onNavigateBack = { activeViewerMediaId = null },
+                        onEditVideo = { uri ->
+                            activeViewerMediaId = null
+                            onEditVideo(uri)
+                        },
+                        onEditImage = { uri ->
+                            activeViewerMediaId = null
+                            onEditImage(uri)
+                        }
+                    )
                 }
             }
         }
