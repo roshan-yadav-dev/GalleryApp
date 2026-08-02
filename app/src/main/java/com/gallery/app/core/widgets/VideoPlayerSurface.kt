@@ -9,6 +9,8 @@ import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -315,15 +317,15 @@ fun VideoPlayerSurface(
 
         // BOTTOM TIMELINE & SCRUBBER SECTION (Non-Overlapping)
         AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(),
-            exit = fadeOut()
+            visible = showControls && showFilmstripFrames,
+            enter = fadeIn() + slideInHorizontally { -it },
+            exit = fadeOut() + slideOutHorizontally { -it }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.9f))
-                    .padding(bottom = 8.dp, top = 4.dp)
+                    .padding(bottom = 68.dp, top = 4.dp)
             ) {
                 // Text Overlay Entry Bar
                 if (showTextEntry) {
