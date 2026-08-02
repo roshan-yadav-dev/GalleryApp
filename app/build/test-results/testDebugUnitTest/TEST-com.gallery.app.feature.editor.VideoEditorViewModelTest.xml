@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.gallery.app.feature.editor.VideoEditorViewModelTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-08-02T14:20:43.795Z" hostname="fedora" time="0.023">
+  <properties/>
+  <testcase name="test TimelineHistoryManager undo and redo stacks" classname="com.gallery.app.feature.editor.VideoEditorViewModelTest" time="0.005"/>
+  <testcase name="test timeline state overall duration calculation" classname="com.gallery.app.feature.editor.VideoEditorViewModelTest" time="0.01"/>
+  <testcase name="test clip duration calculation" classname="com.gallery.app.feature.editor.VideoEditorViewModelTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
