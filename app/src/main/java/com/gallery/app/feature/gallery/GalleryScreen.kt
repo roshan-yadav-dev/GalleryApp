@@ -1,11 +1,5 @@
 package com.gallery.app.feature.gallery
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,6 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gallery.app.R
 import com.gallery.app.core.domain.model.GridSize
@@ -168,16 +164,15 @@ fun GalleryScreen(
                 }
             }
 
-            // Inline Fullscreen Media Viewer Overlay (Swiping left/right across all gallery media)
-            AnimatedVisibility(
-                visible = activeViewerMediaId != null,
-                enter = fadeIn() + scaleIn(initialScale = 0.95f),
-                exit = fadeOut() + scaleOut(targetScale = 0.95f)
-            ) {
-                if (activeViewerMediaId != null) {
-                    BackHandler {
-                        activeViewerMediaId = null
-                    }
+            // Fullscreen Immersion Window Overlay (Hides TopAppBar and Bottom NavigationBar)
+            if (activeViewerMediaId != null) {
+                Dialog(
+                    onDismissRequest = { activeViewerMediaId = null },
+                    properties = DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        decorFitsSystemWindows = false
+                    )
+                ) {
                     MediaViewerScreen(
                         initialMediaId = activeViewerMediaId,
                         mediaItemsList = uiState.allItems,
