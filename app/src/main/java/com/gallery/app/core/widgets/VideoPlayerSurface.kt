@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -52,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -118,7 +121,6 @@ fun VideoPlayerSurface(
             }
     }
 
-    // Dynamic Play/Pause state depending on active page state
     LaunchedEffect(isActive, isPlaying) {
         if (isActive && isPlaying) {
             exoPlayer.playWhenReady = true
@@ -148,7 +150,6 @@ fun VideoPlayerSurface(
         }
     }
 
-    // Position sync loop (runs only when active and playing)
     LaunchedEffect(isActive, isPlaying, isScrubbing) {
         if (isActive && isPlaying && !isScrubbing) {
             while (true) {
@@ -158,7 +159,6 @@ fun VideoPlayerSurface(
         }
     }
 
-    // Asynchronous Cached Thumbnail Extraction
     LaunchedEffect(videoUri, duration, isActive) {
         if (isActive && duration > 0) {
             val cacheKey = videoUri.toString()
@@ -286,7 +286,7 @@ fun VideoPlayerSurface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(bottom = 115.dp, start = 16.dp, end = 16.dp),
+                        .padding(bottom = 135.dp, start = 16.dp, end = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (showTextEntry) {
@@ -355,7 +355,7 @@ fun VideoPlayerSurface(
                     }
                 }
 
-                // Bottom Inline Frame Filmstrip Scrubber Container
+                // Bottom Inline Frame Filmstrip & Ruler Navigation Bar Container
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -363,6 +363,7 @@ fun VideoPlayerSurface(
                         .background(Color.Black.copy(alpha = 0.85f))
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
+                    // Controls Row (Time Badge & Volume Button)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -411,8 +412,45 @@ fun VideoPlayerSurface(
                         }
                     }
 
+                    // Ruler Scale Navigation Bar (Tick Marks Scale & Milestone Dots)
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(16.dp)
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        val totalTicks = 48
+                        val spacing = size.width / totalTicks
+                        for (i in 0..totalTicks) {
+                            val x = i * spacing
+                            val isMajor = i % 6 == 0
+                            val tickHeight = if (isMajor) size.height * 0.85f else size.height * 0.45f
+                            val color = if (isMajor) Color.White else Color.White.copy(alpha = 0.45f)
+                            val strokeWidth = if (isMajor) 2.dp.toPx() else 1.dp.toPx()
+
+                            drawLine(
+                                color = color,
+                                start = Offset(x, size.height - tickHeight),
+                                end = Offset(x, size.height),
+                                strokeWidth = strokeWidth
+                            )
+
+                            // Magenta milestone dots on major ticks
+                            if (i % 12 == 0 && i > 0 && i < totalTicks) {
+                                drawCircle(
+                                    color = Color(0xFFFF2A6D),
+                                    radius = 3.dp.toPx(),
+                                    center = Offset(x, size.height - tickHeight - 4.dp.toPx())
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     val progressRatio = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
 
+                    // Filmstrip Frame Box with Yellow Handle Grips
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -454,6 +492,7 @@ fun VideoPlayerSurface(
                                 )
                             }
                     ) {
+                        // Frame Thumbnails
                         if (thumbnails.isNotEmpty()) {
                             Row(modifier = Modifier.fillMaxSize()) {
                                 thumbnails.forEach { bmp ->
@@ -480,14 +519,41 @@ fun VideoPlayerSurface(
                             }
                         }
 
-                        // Filmstrip Yellow Trim Highlight Border
+                        // Left Yellow Trim Handle Grip
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .border(2.dp, Color(0xFFFFCC00), RoundedCornerShape(8.dp))
-                        )
+                                .align(Alignment.CenterStart)
+                                .width(10.dp)
+                                .fillMaxHeight()
+                                .background(Color(0xFFFFCC00)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(18.dp)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                            )
+                        }
 
-                        // RenderThread / GPU-Accelerated Playhead Indicator Line
+                        // Right Yellow Trim Handle Grip
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .width(10.dp)
+                                .fillMaxHeight()
+                                .background(Color(0xFFFFCC00)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(2.dp)
+                                    .height(18.dp)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                            )
+                        }
+
+                        // Playhead Line (White + Red Center Line)
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
@@ -495,7 +561,8 @@ fun VideoPlayerSurface(
                                 .graphicsLayer {
                                     translationX = progressRatio * (stripWidthPx - 20f)
                                 }
-                                .padding(vertical = 2.dp)
+                                .padding(vertical = 1.dp)
+                                .width(4.dp)
                                 .background(Color.White, RoundedCornerShape(2.dp))
                                 .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
                         )
