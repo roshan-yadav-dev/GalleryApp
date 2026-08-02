@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -76,68 +77,110 @@ import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.ui.PlayerView
 import com.gallery.app.core.common.DateFormatter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-private object ThumbnailCache {
-    val cache = LruCache<String, List<Bitmap>>(10)
-}
+private val thumbnailCache = LruCache<String, Bitmap>(30)
 
 @Composable
 fun VideoPlayerSurface(
     videoUri: Uri,
-    isActive: Boolean = true,
+    isActive: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var isPlaying by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var showControls by remember { mutableStateOf(true) }
+    var isScrubbing by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
+    var showFilmstripFrames by remember { mutableStateOf(false) }
 
-    // Overlay Text
+    // Text Overlay States
     var overlayText by remember { mutableStateOf("") }
     var showTextEntry by remember { mutableStateOf(false) }
     var activeTextStyleIndex by remember { mutableStateOf(0) }
 
-    // Filmstrip Thumbnails
-    val thumbnails = remember { mutableStateListOf<Bitmap>() }
-    var containerWidthPx by remember { mutableFloatStateOf(1f) }
-    var isScrubbing by remember { mutableStateOf(false) }
+    // Scrubber track container width
+    var containerWidthPx by remember { mutableFloatStateOf(0f) }
 
-    // Low-Latency ExoPlayer Instance
+    // Filmstrip Frame Thumbnails list
+    val filmstripThumbnails = remember { mutableStateListOf<Bitmap>() }
+
+    // Low-Latency ExoPlayer initialization with 500ms min buffer
     val exoPlayer = remember {
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(1000, 5000, 500, 1000)
+            .setBufferDurationsMs(500, 1500, 250, 500)
             .build()
 
         ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .build().apply {
-                setMediaItem(MediaItem.fromUri(videoUri))
-                setSeekParameters(SeekParameters.CLOSEST_SYNC)
-                repeatMode = Player.REPEAT_MODE_ONE
+                val mediaItem = MediaItem.fromUri(videoUri)
+                setMediaItem(mediaItem)
                 prepare()
+                playWhenReady = isActive
             }
     }
 
-    LaunchedEffect(isActive, isPlaying) {
-        if (isActive && isPlaying) {
+    // Dynamic Frame Extraction for Scrubbing Filmstrip
+    LaunchedEffect(videoUri, showFilmstripFrames) {
+        if (!showFilmstripFrames) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            try {
+                val retriever = MediaMetadataRetriever()
+                retriever.setDataSource(context, videoUri)
+                val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val durMs = durationStr?.toLongOrNull() ?: 1000L
+
+                val frameCount = 10
+                val intervalUs = (durMs * 1000L) / frameCount
+
+                val extracted = mutableListOf<Bitmap>()
+                for (i in 0 until frameCount) {
+                    val timeUs = i * intervalUs
+                    val cacheKey = "${videoUri}_$timeUs"
+                    var bmp = thumbnailCache.get(cacheKey)
+                    if (bmp == null) {
+                        bmp = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        if (bmp != null) {
+                            thumbnailCache.put(cacheKey, bmp)
+                        }
+                    }
+                    if (bmp != null) {
+                        extracted.add(bmp)
+                    }
+                }
+                retriever.release()
+
+                withContext(Dispatchers.Main) {
+                    filmstripThumbnails.clear()
+                    filmstripThumbnails.addAll(extracted)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // Active page playback control
+    LaunchedEffect(isActive) {
+        if (isActive) {
             exoPlayer.playWhenReady = true
-            exoPlayer.play()
         } else {
             exoPlayer.playWhenReady = false
             exoPlayer.pause()
         }
     }
 
-    DisposableEffect(videoUri) {
+    // Continuous Position Tracker Listener
+    DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
             }
+
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) {
                     duration = exoPlayer.duration.coerceAtLeast(0L)
@@ -152,116 +195,77 @@ fun VideoPlayerSurface(
         }
     }
 
-    LaunchedEffect(isActive, isPlaying, isScrubbing) {
-        if (isActive && isPlaying && !isScrubbing) {
-            while (true) {
-                currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
-                delay(60)
-            }
+    // Smooth UI Position Polling Loop
+    LaunchedEffect(isPlaying, isScrubbing) {
+        while (isPlaying && !isScrubbing) {
+            currentPosition = exoPlayer.currentPosition.coerceAtLeast(0L)
+            kotlinx.coroutines.delay(16) // ~60fps smooth sync
         }
     }
 
-    LaunchedEffect(videoUri, duration, isActive) {
-        if (isActive && duration > 0) {
-            val cacheKey = videoUri.toString()
-            val cachedList = ThumbnailCache.cache.get(cacheKey)
-            if (cachedList != null) {
-                thumbnails.clear()
-                thumbnails.addAll(cachedList)
-            } else {
-                withContext(Dispatchers.Default) {
-                    val list = mutableListOf<Bitmap>()
-                    val retriever = MediaMetadataRetriever()
-                    try {
-                        retriever.setDataSource(context, videoUri)
-                        val count = 14
-                        val interval = duration / count
-                        for (i in 0 until count) {
-                            val timeUs = (i * interval) * 1000L
-                            val bmp = if (android.os.Build.VERSION.SDK_INT >= 27) {
-                                retriever.getScaledFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 80, 60)
-                            } else {
-                                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                            }
-                            if (bmp != null) list.add(bmp)
-                        }
-                    } catch (_: Exception) {
-                    } finally {
-                        try { retriever.release() } catch (_: Exception) {}
-                    }
-                    if (list.isNotEmpty()) {
-                        ThumbnailCache.cache.put(cacheKey, list)
-                        withContext(Dispatchers.Main) {
-                            thumbnails.clear()
-                            thumbnails.addAll(list)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clickable {
-                showControls = !showControls
-                onTap()
-            }
+    // Root Non-Overlapping Vertical Layout: Preview on top, Scrubber on bottom
+    Column(
+        modifier = modifier.fillMaxSize()
     ) {
-        // Player Surface View
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                    layoutParams = FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
+        // TOP PREVIEW CANVAS (Dynamically scales inside weight(1f))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            showControls = !showControls
+                            onTap()
+                        },
+                        onLongPress = {
+                            showFilmstripFrames = !showFilmstripFrames
+                        }
                     )
                 }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Text Overlay Canvas
-        if (overlayText.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp)
-                    .background(
-                        when (activeTextStyleIndex) {
-                            1 -> Color.Black.copy(alpha = 0.6f)
-                            2 -> Color.White.copy(alpha = 0.85f)
-                            else -> Color.Transparent
-                        },
-                        RoundedCornerShape(8.dp)
-                    )
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = overlayText,
-                    color = if (activeTextStyleIndex == 2) Color.Black else Color.White,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        // Overlay Controls Layer
-        AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-            ) {
-                // Play / Pause Central Button
+            // Player Surface View
+            AndroidView(
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = false
+                        layoutParams = FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Text Overlay Canvas
+            if (overlayText.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                        .background(
+                            when (activeTextStyleIndex) {
+                                1 -> Color.Black.copy(alpha = 0.6f)
+                                2 -> Color.White.copy(alpha = 0.85f)
+                                else -> Color.Transparent
+                            },
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = overlayText,
+                        color = if (activeTextStyleIndex == 2) Color.Black else Color.White,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Central Play / Pause Quick Action
+            if (showControls) {
                 IconButton(
                     onClick = {
                         if (exoPlayer.isPlaying) {
@@ -272,56 +276,120 @@ fun VideoPlayerSurface(
                     },
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .size(64.dp)
+                        .size(60.dp)
                         .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Pause" else "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(36.dp)
                     )
                 }
+            }
 
-                // Bottom Fixed Playhead + Moving Filmstrip & Ruler Navigation Bar Container
-                Column(
+            // Floating Hold-for-2s Hint Badge
+            if (!showFilmstripFrames) {
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.85f))
-                        .navigationBarsPadding()
-                        .padding(bottom = 8.dp, top = 8.dp)
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    // Time Badge & Mute Toggle Controls
+                    Text(
+                        text = "Hold 2s for frame timeline",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        // BOTTOM TIMELINE & SCRUBBER SECTION (Non-Overlapping)
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.9f))
+                    .padding(bottom = 12.dp, top = 8.dp)
+            ) {
+                // Text Overlay Entry Bar
+                if (showTextEntry) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .background(Color(0xFF1E1E24), RoundedCornerShape(12.dp))
+                            .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
+                        OutlinedTextField(
+                            value = overlayText,
+                            onValueChange = { overlayText = it },
+                            placeholder = { Text("Add text overlay...", color = Color.Gray) },
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White
+                            )
+                        )
+                        IconButton(onClick = { showTextEntry = false }) {
+                            Text("Done", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Controls Row: Play/Pause Time & Volume & Text Style Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .background(Color(0xFF2A2D34), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White,
                             modifier = Modifier
-                                .background(Color(0xFF2A2D34), RoundedCornerShape(16.dp))
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                .size(16.dp)
+                                .clickable {
+                                    if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                                }
+                        )
+                        Text(
+                            text = "${DateFormatter.formatDuration(currentPosition)} / ${DateFormatter.formatDuration(duration)}",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { showTextEntry = !showTextEntry },
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clickable {
-                                        if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                                    }
-                            )
-                            Text(
-                                text = "${DateFormatter.formatDuration(currentPosition)} / ${DateFormatter.formatDuration(duration)}",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
+                                imageVector = Icons.Default.FormatSize,
+                                contentDescription = "Add Text",
+                                tint = if (showTextEntry) MaterialTheme.colorScheme.primary else Color.White,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
 
@@ -340,17 +408,20 @@ fun VideoPlayerSurface(
                             )
                         }
                     }
+                }
 
-                    val progressRatio = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+                val progressRatio = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+
+                // CONDITION: Video Frames only appear when user long-presses for 2 seconds
+                if (showFilmstripFrames) {
                     val trackWidthPx = maxOf(containerWidthPx * 1.5f, 600f)
                     val density = LocalDensity.current
                     val trackWidthDp = with(density) { trackWidthPx.toDp() }
 
-                    // Scrubber Container Viewport
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(72.dp)
+                            .height(68.dp)
                             .onGloballyPositioned { coords ->
                                 containerWidthPx = coords.size.width.toFloat().coerceAtLeast(1f)
                             }
@@ -382,7 +453,7 @@ fun VideoPlayerSurface(
                                 )
                             }
                     ) {
-                        // Moving Filmstrip & Ruler Scale Track
+                        // Filmstrip Track
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
@@ -393,11 +464,10 @@ fun VideoPlayerSurface(
                                 }
                         ) {
                             Column(modifier = Modifier.fillMaxSize()) {
-                                // Moving Ruler Tick-Mark Scale
                                 Canvas(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(16.dp)
+                                        .height(14.dp)
                                 ) {
                                     val totalTicks = 60
                                     val spacing = size.width / totalTicks
@@ -410,105 +480,67 @@ fun VideoPlayerSurface(
 
                                         drawLine(
                                             color = color,
-                                            start = Offset(x, size.height - tickHeight),
-                                            end = Offset(x, size.height),
+                                            start = Offset(x, size.height),
+                                            end = Offset(x, size.height - tickHeight),
                                             strokeWidth = strokeWidth
                                         )
-
-                                        // Magenta milestone dots on major ticks
-                                        if (i % 10 == 0 && i > 0 && i < totalTicks) {
-                                            drawCircle(
-                                                color = Color(0xFFFF2A6D),
-                                                radius = 3.dp.toPx(),
-                                                center = Offset(x, size.height - tickHeight - 4.dp.toPx())
-                                            )
-                                        }
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(2.dp))
-
-                                // Moving Frame Thumbnails Strip
-                                Box(
+                                Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(52.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFF141418))
-                                        .border(2.dp, Color(0xFFFFCC00), RoundedCornerShape(8.dp))
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .border(1.dp, Color.Yellow, RoundedCornerShape(4.dp))
                                 ) {
-                                    if (thumbnails.isNotEmpty()) {
-                                        Row(modifier = Modifier.fillMaxSize()) {
-                                            thumbnails.forEach { bmp ->
-                                                Image(
-                                                    bitmap = bmp.asImageBitmap(),
-                                                    contentDescription = "Video Frame",
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .fillMaxHeight()
-                                                )
-                                            }
+                                    if (filmstripThumbnails.isNotEmpty()) {
+                                        filmstripThumbnails.forEach { bmp ->
+                                            Image(
+                                                bitmap = bmp.asImageBitmap(),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxHeight()
+                                            )
                                         }
                                     } else {
-                                        Row(modifier = Modifier.fillMaxSize()) {
-                                            repeat(12) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .weight(1f)
-                                                        .fillMaxHeight()
-                                                        .background(if (it % 2 == 0) Color(0xFF22222A) else Color(0xFF1A1A20))
-                                                )
-                                            }
-                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.DarkGray)
+                                        )
                                     }
-
-                                    // Left & Right Yellow End Trims
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.CenterStart)
-                                            .width(8.dp)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFFFFCC00))
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .align(Alignment.CenterEnd)
-                                            .width(8.dp)
-                                            .fillMaxHeight()
-                                            .background(Color(0xFFFFCC00))
-                                    )
                                 }
                             }
                         }
 
-                        // FIXED CENTER PLAYHEAD BAR & PIN (Stays at Center of Screen)
+                        // Stationary Center Playhead Indicator
                         Box(
                             modifier = Modifier
                                 .align(Alignment.Center)
+                                .width(3.dp)
                                 .fillMaxHeight()
-                                .width(4.dp)
-                        ) {
-                            // Top Playhead Circle Pin
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .border(1.dp, Color.Red, CircleShape)
-                            )
-                            // Vertical Indicator Line
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .fillMaxHeight()
-                                    .width(3.dp)
-                                    .padding(top = 8.dp)
-                                    .background(Color.White, RoundedCornerShape(2.dp))
-                                    .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
-                            )
-                        }
+                                .background(Color.Magenta)
+                        )
+                    }
+                } else {
+                    // Standard Slim Progress Bar View
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        LinearProgressIndicator(
+                            progress = { progressRatio },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
                     }
                 }
             }

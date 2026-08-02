@@ -6,18 +6,23 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -37,18 +42,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.gallery.app.core.domain.model.MediaItem
 import com.gallery.app.core.widgets.DetailsBottomSheet
 import com.gallery.app.core.widgets.LoadingStateView
 import com.gallery.app.core.widgets.PinchZoomViewer
 import com.gallery.app.core.widgets.VideoPlayerSurface
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -63,6 +73,7 @@ fun MediaViewerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState()
+    val coroutineScope = rememberCoroutineScope()
 
     val effectiveItems = mediaItemsList ?: uiState.mediaItems
     if (effectiveItems.isEmpty()) {
@@ -128,7 +139,7 @@ fun MediaViewerScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Main Media Pager View (Supports both Photos and Videos swiping seamlessly left/right)
+            // Main Media Pager View (Photos and Videos swiping)
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
@@ -148,70 +159,194 @@ fun MediaViewerScreen(
                 }
             }
 
-            // Bottom Action Navigation Bar Overlay
+            // Left Floating Navigation Arrow (Previous Item)
+            if (pagerState.currentPage > 0 && uiState.showSystemBars) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 12.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
+                        contentDescription = "Previous Media",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            // Right Floating Navigation Arrow (Next Item)
+            if (pagerState.currentPage < effectiveItems.size - 1 && uiState.showSystemBars) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 12.dp)
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.NavigateNext,
+                        contentDescription = "Next Media",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+
+            // Bottom Navigation Overlay Column: Before/Next Controller Pill + Actions Row
             AnimatedVisibility(
-                visible = uiState.showSystemBars && currentItem != null && !currentItem.isVideo,
+                visible = uiState.showSystemBars && currentItem != null,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.85f))
-                        .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(Color.Black.copy(alpha = 0.85f)),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Share
-                    IconButton(
-                        onClick = {
-                            if (currentItem != null) {
-                                val sendIntent = Intent().apply {
-                                    action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_STREAM, currentItem.uri)
-                                    type = currentItem.mimeType
-                                }
-                                context.startActivity(Intent.createChooser(sendIntent, "Share Media"))
-                            }
-                        }
+                    // Before & Next Content Quick Jumper Bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
+                        // Previous Content Button
+                        if (pagerState.currentPage > 0) {
+                            val prevItem = effectiveItems[pagerState.currentPage - 1]
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF2A2D34))
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = prevItem.displayName.take(12),
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        } else {
+                            Box(modifier = Modifier.size(1.dp))
+                        }
 
-                    // Favorite
-                    IconButton(onClick = { viewModel.toggleFavorite() }) {
-                        Icon(
-                            imageVector = if (currentItem?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Favorite",
-                            tint = if (currentItem?.isFavorite == true) MaterialTheme.colorScheme.tertiary else Color.White,
-                            modifier = Modifier.size(24.dp)
+                        // Index Indicator
+                        Text(
+                            text = "${pagerState.currentPage + 1} of ${effectiveItems.size}",
+                            color = Color.LightGray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                    }
 
-                    // Edit
-                    IconButton(
-                        onClick = {
-                            val uriStr = currentItem?.uri?.toString() ?: return@IconButton
-                            if (currentItem.isVideo) {
-                                onEditVideo(uriStr)
-                            } else {
-                                onEditImage(uriStr)
+                        // Next Content Button
+                        if (pagerState.currentPage < effectiveItems.size - 1) {
+                            val nextItem = effectiveItems[pagerState.currentPage + 1]
+                            Row(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFF2A2D34))
+                                    .clickable {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                        }
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = nextItem.displayName.take(12),
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
+                        } else {
+                            Box(modifier = Modifier.size(1.dp))
                         }
+                    }
+
+                    // Bottom Action Buttons Row (Share, Favorite, Edit, Delete, Info)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
+                        IconButton(
+                            onClick = {
+                                if (currentItem != null) {
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_STREAM, currentItem.uri)
+                                        type = currentItem.mimeType
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Share Media"))
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
 
-                    // Delete
-                    IconButton(onClick = { viewModel.deleteCurrentMedia() }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
+                        IconButton(onClick = { viewModel.toggleFavorite() }) {
+                            Icon(
+                                imageVector = if (currentItem?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Favorite",
+                                tint = if (currentItem?.isFavorite == true) MaterialTheme.colorScheme.tertiary else Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
 
-                    // Info / EXIF Details
-                    IconButton(onClick = { viewModel.showDetails() }) {
-                        Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(24.dp))
+                        IconButton(
+                            onClick = {
+                                val uriStr = currentItem?.uri?.toString() ?: return@IconButton
+                                if (currentItem.isVideo) {
+                                    onEditVideo(uriStr)
+                                } else {
+                                    onEditImage(uriStr)
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+
+                        IconButton(onClick = { viewModel.deleteCurrentMedia() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+
+                        IconButton(onClick = { viewModel.showDetails() }) {
+                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
                     }
                 }
             }
