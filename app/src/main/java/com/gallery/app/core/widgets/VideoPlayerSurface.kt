@@ -102,10 +102,10 @@ fun VideoPlayerSurface(
 
     // Filmstrip Thumbnails
     val thumbnails = remember { mutableStateListOf<Bitmap>() }
-    var stripWidthPx by remember { mutableFloatStateOf(1f) }
+    var containerWidthPx by remember { mutableFloatStateOf(1f) }
     var isScrubbing by remember { mutableStateOf(false) }
 
-    // Optimized Low-Latency ExoPlayer Instance
+    // Low-Latency ExoPlayer Instance
     val exoPlayer = remember {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(1000, 5000, 500, 1000)
@@ -172,7 +172,7 @@ fun VideoPlayerSurface(
                     val retriever = MediaMetadataRetriever()
                     try {
                         retriever.setDataSource(context, videoUri)
-                        val count = 10
+                        val count = 14
                         val interval = duration / count
                         for (i in 0 until count) {
                             val timeUs = (i * interval) * 1000L
@@ -286,7 +286,7 @@ fun VideoPlayerSurface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(bottom = 135.dp, start = 16.dp, end = 16.dp),
+                        .padding(bottom = 150.dp, start = 16.dp, end = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (showTextEntry) {
@@ -355,19 +355,19 @@ fun VideoPlayerSurface(
                     }
                 }
 
-                // Bottom Inline Frame Filmstrip & Ruler Navigation Bar Container
+                // Bottom Fixed Playhead + Moving Filmstrip & Ruler Navigation Bar Container
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.85f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(bottom = 12.dp, top = 8.dp)
                 ) {
-                    // Controls Row (Time Badge & Volume Button)
+                    // Time Badge & Mute Toggle Controls
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 6.dp),
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -412,66 +412,22 @@ fun VideoPlayerSurface(
                         }
                     }
 
-                    // Ruler Scale Navigation Bar (Tick Marks Scale & Milestone Dots)
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(16.dp)
-                            .padding(horizontal = 4.dp)
-                    ) {
-                        val totalTicks = 48
-                        val spacing = size.width / totalTicks
-                        for (i in 0..totalTicks) {
-                            val x = i * spacing
-                            val isMajor = i % 6 == 0
-                            val tickHeight = if (isMajor) size.height * 0.85f else size.height * 0.45f
-                            val color = if (isMajor) Color.White else Color.White.copy(alpha = 0.45f)
-                            val strokeWidth = if (isMajor) 2.dp.toPx() else 1.dp.toPx()
-
-                            drawLine(
-                                color = color,
-                                start = Offset(x, size.height - tickHeight),
-                                end = Offset(x, size.height),
-                                strokeWidth = strokeWidth
-                            )
-
-                            // Magenta milestone dots on major ticks
-                            if (i % 12 == 0 && i > 0 && i < totalTicks) {
-                                drawCircle(
-                                    color = Color(0xFFFF2A6D),
-                                    radius = 3.dp.toPx(),
-                                    center = Offset(x, size.height - tickHeight - 4.dp.toPx())
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
                     val progressRatio = if (duration > 0) (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+                    val trackWidthPx = maxOf(containerWidthPx * 1.8f, 1200f)
 
-                    // Filmstrip Frame Box with Yellow Handle Grips
+                    // Scrubber Container Viewport
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF141418))
-                            .border(2.dp, Color(0xFFFFCC00), RoundedCornerShape(8.dp))
+                            .height(72.dp)
                             .onGloballyPositioned { coords ->
-                                stripWidthPx = coords.size.width.toFloat().coerceAtLeast(1f)
+                                containerWidthPx = coords.size.width.toFloat().coerceAtLeast(1f)
                             }
-                            .pointerInput(duration) {
+                            .pointerInput(duration, containerWidthPx) {
                                 detectHorizontalDragGestures(
-                                    onDragStart = { offset ->
+                                    onDragStart = {
                                         isScrubbing = true
                                         exoPlayer.setSeekParameters(SeekParameters.CLOSEST_SYNC)
-                                        if (duration > 0 && stripWidthPx > 0) {
-                                            val fraction = (offset.x / stripWidthPx).coerceIn(0f, 1f)
-                                            val newPos = (fraction * duration).toLong()
-                                            exoPlayer.seekTo(newPos)
-                                            currentPosition = newPos
-                                        }
                                     },
                                     onDragEnd = {
                                         isScrubbing = false
@@ -481,10 +437,13 @@ fun VideoPlayerSurface(
                                         isScrubbing = false
                                         exoPlayer.setSeekParameters(SeekParameters.EXACT)
                                     },
-                                    onHorizontalDrag = { change, _ ->
-                                        if (duration > 0 && stripWidthPx > 0) {
-                                            val fraction = (change.position.x / stripWidthPx).coerceIn(0f, 1f)
-                                            val newPos = (fraction * duration).toLong()
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        if (duration > 0 && trackWidthPx > 0) {
+                                            val currentRatio = (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                                            val deltaRatio = -dragAmount / trackWidthPx
+                                            val newRatio = (currentRatio + deltaRatio).coerceIn(0f, 1f)
+                                            val newPos = (newRatio * duration).toLong()
                                             exoPlayer.seekTo(newPos)
                                             currentPosition = newPos
                                         }
@@ -492,80 +451,133 @@ fun VideoPlayerSurface(
                                 )
                             }
                     ) {
-                        // Frame Thumbnails
-                        if (thumbnails.isNotEmpty()) {
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                thumbnails.forEach { bmp ->
-                                    Image(
-                                        bitmap = bmp.asImageBitmap(),
-                                        contentDescription = "Video Frame",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                    )
+                        // Moving Filmstrip & Ruler Scale Track
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width((trackWidthPx / LocalContext.current.resources.displayMetrics.density).dp)
+                                .graphicsLayer {
+                                    val halfViewport = containerWidthPx / 2f
+                                    translationX = halfViewport - (progressRatio * trackWidthPx)
                                 }
-                            }
-                        } else {
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                repeat(10) {
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // Moving Ruler Tick-Mark Scale
+                                Canvas(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(16.dp)
+                                ) {
+                                    val totalTicks = 60
+                                    val spacing = size.width / totalTicks
+                                    for (i in 0..totalTicks) {
+                                        val x = i * spacing
+                                        val isMajor = i % 5 == 0
+                                        val tickHeight = if (isMajor) size.height * 0.85f else size.height * 0.45f
+                                        val color = if (isMajor) Color.White else Color.White.copy(alpha = 0.45f)
+                                        val strokeWidth = if (isMajor) 2.dp.toPx() else 1.dp.toPx()
+
+                                        drawLine(
+                                            color = color,
+                                            start = Offset(x, size.height - tickHeight),
+                                            end = Offset(x, size.height),
+                                            strokeWidth = strokeWidth
+                                        )
+
+                                        // Magenta milestone dots on major ticks
+                                        if (i % 10 == 0 && i > 0 && i < totalTicks) {
+                                            drawCircle(
+                                                color = Color(0xFFFF2A6D),
+                                                radius = 3.dp.toPx(),
+                                                center = Offset(x, size.height - tickHeight - 4.dp.toPx())
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                // Moving Frame Thumbnails Strip
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(52.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFF141418))
+                                        .border(2.dp, Color(0xFFFFCC00), RoundedCornerShape(8.dp))
+                                ) {
+                                    if (thumbnails.isNotEmpty()) {
+                                        Row(modifier = Modifier.fillMaxSize()) {
+                                            thumbnails.forEach { bmp ->
+                                                Image(
+                                                    bitmap = bmp.asImageBitmap(),
+                                                    contentDescription = "Video Frame",
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxHeight()
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Row(modifier = Modifier.fillMaxSize()) {
+                                            repeat(12) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .fillMaxHeight()
+                                                        .background(if (it % 2 == 0) Color(0xFF22222A) else Color(0xFF1A1A20))
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Left & Right Yellow End Trims
                                     Box(
                                         modifier = Modifier
-                                            .weight(1f)
+                                            .align(Alignment.CenterStart)
+                                            .width(8.dp)
                                             .fillMaxHeight()
-                                            .background(if (it % 2 == 0) Color(0xFF22222A) else Color(0xFF1A1A20))
+                                            .background(Color(0xFFFFCC00))
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.CenterEnd)
+                                            .width(8.dp)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFFFCC00))
                                     )
                                 }
                             }
                         }
 
-                        // Left Yellow Trim Handle Grip
+                        // FIXED CENTER PLAYHEAD BAR & PIN (Stays at Center of Screen)
                         Box(
                             modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .width(10.dp)
+                                .align(Alignment.Center)
                                 .fillMaxHeight()
-                                .background(Color(0xFFFFCC00)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(2.dp)
-                                    .height(18.dp)
-                                    .background(Color.Black.copy(alpha = 0.6f))
-                            )
-                        }
-
-                        // Right Yellow Trim Handle Grip
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .width(10.dp)
-                                .fillMaxHeight()
-                                .background(Color(0xFFFFCC00)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(2.dp)
-                                    .height(18.dp)
-                                    .background(Color.Black.copy(alpha = 0.6f))
-                            )
-                        }
-
-                        // Playhead Line (White + Red Center Line)
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .padding(start = 2.dp)
-                                .graphicsLayer {
-                                    translationX = progressRatio * (stripWidthPx - 20f)
-                                }
-                                .padding(vertical = 1.dp)
                                 .width(4.dp)
-                                .background(Color.White, RoundedCornerShape(2.dp))
-                                .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
-                        )
+                        ) {
+                            // Top Playhead Circle Pin
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .border(1.dp, Color.Red, CircleShape)
+                            )
+                            // Vertical Indicator Line
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .fillMaxHeight()
+                                    .width(3.dp)
+                                    .padding(top = 8.dp)
+                                    .background(Color.White, RoundedCornerShape(2.dp))
+                                    .border(1.dp, Color.Red, RoundedCornerShape(2.dp))
+                            )
+                        }
                     }
                 }
             }
