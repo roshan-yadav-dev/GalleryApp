@@ -86,6 +86,8 @@ fun VideoPlayerSurface(
     videoUri: Uri,
     isActive: Boolean,
     onTap: () -> Unit,
+    showFilmstripFrames: Boolean = false,
+    onToggleFilmstrip: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -95,7 +97,6 @@ fun VideoPlayerSurface(
     var showControls by remember { mutableStateOf(true) }
     var isScrubbing by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
-    var showFilmstripFrames by remember { mutableStateOf(false) }
 
     // Text Overlay States
     var overlayText by remember { mutableStateOf("") }
@@ -219,7 +220,7 @@ fun VideoPlayerSurface(
                             onTap()
                         },
                         onLongPress = {
-                            showFilmstripFrames = !showFilmstripFrames
+                            onToggleFilmstrip()
                         }
                     )
                 }
@@ -316,7 +317,7 @@ fun VideoPlayerSurface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.9f))
-                    .padding(bottom = 12.dp, top = 8.dp)
+                    .padding(bottom = 8.dp, top = 4.dp)
             ) {
                 // Text Overlay Entry Bar
                 if (showTextEntry) {
@@ -348,7 +349,7 @@ fun VideoPlayerSurface(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -421,7 +422,7 @@ fun VideoPlayerSurface(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(68.dp)
+                            .height(64.dp)
                             .onGloballyPositioned { coords ->
                                 containerWidthPx = coords.size.width.toFloat().coerceAtLeast(1f)
                             }
@@ -530,7 +531,7 @@ fun VideoPlayerSurface(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
                     ) {
                         LinearProgressIndicator(
                             progress = { progressRatio },

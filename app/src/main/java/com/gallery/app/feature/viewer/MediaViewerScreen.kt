@@ -4,30 +4,38 @@ import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.NavigateBefore
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,17 +50,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.gallery.app.core.common.DateFormatter
 import com.gallery.app.core.domain.model.MediaItem
 import com.gallery.app.core.widgets.DetailsBottomSheet
 import com.gallery.app.core.widgets.LoadingStateView
@@ -75,6 +90,8 @@ fun MediaViewerScreen(
     val sheetState = rememberModalBottomSheetState()
     val coroutineScope = rememberCoroutineScope()
 
+    var showVideoFrames by remember { mutableStateOf(false) }
+
     val effectiveItems = mediaItemsList ?: uiState.mediaItems
     if (effectiveItems.isEmpty()) {
         if (uiState.isLoading) {
@@ -94,9 +111,13 @@ fun MediaViewerScreen(
         pageCount = { effectiveItems.size }
     )
 
+    val thumbnailListState = rememberLazyListState()
+
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
             viewModel.onPageChanged(page)
+            showVideoFrames = false
+            thumbnailListState.animateScrollToItem((page - 2).coerceAtLeast(0))
         }
     }
 
@@ -105,6 +126,13 @@ fun MediaViewerScreen(
     } else {
         uiState.currentMediaItem
     }
+
+    val timestamp = currentItem?.dateModified?.takeIf { it > 0 }
+        ?: currentItem?.dateAdded?.takeIf { it > 0 }
+        ?: System.currentTimeMillis()
+
+    val formattedDate = DateFormatter.formatDateHeader(timestamp)
+    val formattedTime = DateFormatter.formatTimeOnly(timestamp)
 
     Scaffold(
         containerColor = Color.Black,
@@ -116,15 +144,33 @@ fun MediaViewerScreen(
             ) {
                 TopAppBar(
                     title = {
-                        // Title left empty so content name is not displayed on screen
+                        Column {
+                            Text(
+                                text = formattedDate,
+                                color = Color.White,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = formattedTime,
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                     },
+                    actions = {
+                        IconButton(onClick = { viewModel.showDetails() }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color.White)
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black.copy(alpha = 0.5f)
+                        containerColor = Color.Black.copy(alpha = 0.4f)
                     )
                 )
             }
@@ -145,7 +191,9 @@ fun MediaViewerScreen(
                     VideoPlayerSurface(
                         videoUri = item.uri,
                         isActive = (page == pagerState.currentPage),
-                        onTap = { viewModel.toggleSystemBars() }
+                        onTap = { viewModel.toggleSystemBars() },
+                        showFilmstripFrames = showVideoFrames,
+                        onToggleFilmstrip = { showVideoFrames = !showVideoFrames }
                     )
                 } else {
                     PinchZoomViewer(
@@ -155,57 +203,7 @@ fun MediaViewerScreen(
                 }
             }
 
-            // Left Floating Navigation Arrow (Previous Item)
-            if (pagerState.currentPage > 0 && uiState.showSystemBars) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 12.dp)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .clickable {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
-                        contentDescription = "Previous Media",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            // Right Floating Navigation Arrow (Next Item)
-            if (pagerState.currentPage < effectiveItems.size - 1 && uiState.showSystemBars) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 12.dp)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .clickable {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.NavigateNext,
-                        contentDescription = "Next Media",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-
-            // Bottom Navigation Overlay Column: Before/Next Controller Pill + Actions Row
+            // Bottom Navigation Container: Thumbnail Reel Carousel + 5 Actions Bar
             AnimatedVisibility(
                 visible = uiState.showSystemBars && currentItem != null,
                 enter = fadeIn(),
@@ -218,78 +216,64 @@ fun MediaViewerScreen(
                         .background(Color.Black.copy(alpha = 0.85f)),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Before & Next Content Quick Jumper Bar
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Thumbnail Reel Strip (Shown when not inspecting frame timeline)
+                    AnimatedVisibility(
+                        visible = !showVideoFrames,
+                        enter = slideInHorizontally { it } + fadeIn(),
+                        exit = slideOutHorizontally { it } + fadeOut()
                     ) {
-                        // Previous Content Button
-                        if (pagerState.currentPage > 0) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFF2A2D34))
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                        LazyRow(
+                            state = thumbnailListState,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                        ) {
+                            itemsIndexed(effectiveItems, key = { _, item -> item.id }) { index, item ->
+                                val isSelected = (index == pagerState.currentPage)
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .border(
+                                            width = if (isSelected) 2.dp else 0.dp,
+                                            color = if (isSelected) Color.White else Color.Transparent,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(index)
+                                            }
                                         }
+                                ) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(item.uri)
+                                            .size(100, 100)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    if (item.isVideo) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .size(14.dp)
+                                                .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                                        )
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                                Text(
-                                    text = "Prev",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                }
                             }
-                        } else {
-                            Box(modifier = Modifier.size(1.dp))
-                        }
-
-                        // Index Indicator
-                        Text(
-                            text = "${pagerState.currentPage + 1} of ${effectiveItems.size}",
-                            color = Color.LightGray,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        // Next Content Button
-                        if (pagerState.currentPage < effectiveItems.size - 1) {
-                            Row(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(Color(0xFF2A2D34))
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                        }
-                                    }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "Next",
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            }
-                        } else {
-                            Box(modifier = Modifier.size(1.dp))
                         }
                     }
 
-                    // Bottom Action Buttons Row (Share, Favorite, Edit, Delete, Info)
+                    // Bottom Action Icons Row (Share, Favorite, Edit, Delete, Info)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

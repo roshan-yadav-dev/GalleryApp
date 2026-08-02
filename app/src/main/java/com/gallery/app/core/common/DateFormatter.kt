@@ -10,6 +10,12 @@ object DateFormatter {
     private val dateTimeFormat = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault())
     private val monthYearFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
     private val dayFormat = SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.getDefault())
+    private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    fun formatTimeOnly(timestamp: Long): String {
+        val ms = if (timestamp < 100000000000L) timestamp * 1000L else timestamp
+        return timeFormat.format(Date(ms))
+    }
 
     fun formatDateHeader(timestamp: Long): String {
         val target = Calendar.getInstance().apply { timeInMillis = timestamp }
