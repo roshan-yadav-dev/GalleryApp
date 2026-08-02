@@ -213,17 +213,6 @@ fun VideoPlayerSurface(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = {
-                            showControls = !showControls
-                            onTap()
-                        },
-                        onLongPress = {
-                            onToggleFilmstrip()
-                        }
-                    )
-                }
         ) {
             // Player Surface View
             AndroidView(
@@ -238,6 +227,23 @@ fun VideoPlayerSurface(
                     }
                 },
                 modifier = Modifier.fillMaxSize()
+            )
+
+            // Transparent Gesture Overlay Box covering the video canvas
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = {
+                                showControls = !showControls
+                                onTap()
+                            },
+                            onLongPress = {
+                                onToggleFilmstrip()
+                            }
+                        )
+                    }
             )
 
             // Text Overlay Canvas

@@ -198,7 +198,8 @@ fun MediaViewerScreen(
                 } else {
                     PinchZoomViewer(
                         mediaItem = item,
-                        onTap = { viewModel.toggleSystemBars() }
+                        onTap = { viewModel.toggleSystemBars() },
+                        onLongPress = { showVideoFrames = !showVideoFrames }
                     )
                 }
             }

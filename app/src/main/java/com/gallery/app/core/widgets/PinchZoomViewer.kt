@@ -23,6 +23,7 @@ import com.gallery.app.core.domain.model.MediaItem
 fun PinchZoomViewer(
     mediaItem: MediaItem,
     onTap: () -> Unit,
+    onLongPress: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -36,6 +37,7 @@ fun PinchZoomViewer(
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { onTap() },
+                    onLongPress = { onLongPress?.invoke() },
                     onDoubleTap = {
                         scale = if (scale > 1.5f) 1f else 3f
                         if (scale == 1f) {
