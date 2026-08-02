@@ -164,8 +164,8 @@ fun MediaViewerScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 12.dp)
-                        .size(44.dp)
+                        .padding(start = 8.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.5f))
                         .clickable {
@@ -179,7 +179,7 @@ fun MediaViewerScreen(
                         imageVector = Icons.AutoMirrored.Filled.NavigateBefore,
                         contentDescription = "Previous Media",
                         tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -189,8 +189,8 @@ fun MediaViewerScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 12.dp)
-                        .size(44.dp)
+                        .padding(end = 8.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.5f))
                         .clickable {
@@ -204,7 +204,7 @@ fun MediaViewerScreen(
                         imageVector = Icons.AutoMirrored.Filled.NavigateNext,
                         contentDescription = "Next Media",
                         tint = Color.White,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -226,7 +226,7 @@ fun MediaViewerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .padding(horizontal = 12.dp, vertical = 2.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -235,22 +235,22 @@ fun MediaViewerScreen(
                             val prevItem = effectiveItems[pagerState.currentPage - 1]
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(Color(0xFF2A2D34))
                                     .clickable {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(pagerState.currentPage - 1)
                                         }
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 Text(
-                                    text = prevItem.displayName.take(12),
+                                    text = prevItem.displayName.take(10),
                                     color = Color.White,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -262,7 +262,7 @@ fun MediaViewerScreen(
                         Text(
                             text = "${pagerState.currentPage + 1} of ${effectiveItems.size}",
                             color = Color.LightGray,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
 
@@ -271,24 +271,24 @@ fun MediaViewerScreen(
                             val nextItem = effectiveItems[pagerState.currentPage + 1]
                             Row(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(Color(0xFF2A2D34))
                                     .clickable {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(pagerState.currentPage + 1)
                                         }
                                     }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                horizontalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
-                                    text = nextItem.displayName.take(12),
+                                    text = nextItem.displayName.take(10),
                                     color = Color.White,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Medium
                                 )
-                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                             }
                         } else {
                             Box(modifier = Modifier.size(1.dp))
@@ -299,7 +299,7 @@ fun MediaViewerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -313,17 +313,21 @@ fun MediaViewerScreen(
                                     }
                                     context.startActivity(Intent.createChooser(sendIntent, "Share Media"))
                                 }
-                            }
+                            },
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
 
-                        IconButton(onClick = { viewModel.toggleFavorite() }) {
+                        IconButton(
+                            onClick = { viewModel.toggleFavorite() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
                             Icon(
                                 imageVector = if (currentItem?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = "Favorite",
                                 tint = if (currentItem?.isFavorite == true) MaterialTheme.colorScheme.tertiary else Color.White,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
 
@@ -335,17 +339,24 @@ fun MediaViewerScreen(
                                 } else {
                                     onEditImage(uriStr)
                                 }
-                            }
+                            },
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(24.dp))
+                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
 
-                        IconButton(onClick = { viewModel.deleteCurrentMedia() }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(24.dp))
+                        IconButton(
+                            onClick = { viewModel.deleteCurrentMedia() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
 
-                        IconButton(onClick = { viewModel.showDetails() }) {
-                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(24.dp))
+                        IconButton(
+                            onClick = { viewModel.showDetails() },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = "Details", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                     }
                 }
